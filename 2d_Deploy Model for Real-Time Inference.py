@@ -16,23 +16,26 @@
 # COMMAND ----------
 
 # DBTITLE 1,Install Feature Store Components
-# MAGIC %pip install xgboost
-# MAGIC %pip install databricks-feature-store
+# MAGIC %pip install xgboost databricks-feature-store
 
 # COMMAND ----------
 
 # DBTITLE 1,Get Config Info
-# MAGIC %run "./CS 0a: Intro & Config"
+# MAGIC %run "./0a_Intro & Config"
 
 # COMMAND ----------
 
 # DBTITLE 1,Import Required Libraries
 from databricks import feature_store
-
 import pyspark.sql.functions as fn
-
 import mlflow
 from xgboost import XGBClassifier
+import os
+import requests
+import numpy as np
+import pandas as pd
+import json
+import time
 
 # COMMAND ----------
 
@@ -125,7 +128,7 @@ training_set = fs.create_training_set(
 
 # MAGIC %md We then need to retrieve our model, re-log it with the feature set information and move it to production:
 # MAGIC 
-# MAGIC **NOTE** Please note that the *log_model* method provided by the feature store does not directly support the *pyfunc_predict_fn* argument used in *CS 1b*.  However, it does allow additional arguments to be passed in using a kwarg which we are using to specify this option.
+# MAGIC **NOTE** Please note that the *log_model* method provided by the feature store does not directly support the *pyfunc_predict_fn* argument used in *1b*.  However, it does allow additional arguments to be passed in using a kwarg which we are using to specify this option.
 
 # COMMAND ----------
 
@@ -144,7 +147,7 @@ _ = fs.log_model(
   artifact_path='model',
   flavor=mlflow.sklearn,
   training_set=training_set,
-  registered_model_name=config['model name']+'__inference',
+  registered_model_name=config['inference_model_name'],
   **{'pyfunc_predict_fn':'predict_proba'}
   )
 
@@ -155,14 +158,16 @@ _ = fs.log_model(
 client = mlflow.tracking.MlflowClient()
 
 # identify model version in registry
-model_version = client.search_model_versions(f"name='{config['model name']}__inference'")[0].version
+model = client.search_model_versions(f"name='{config['inference_model_name']}'")[0]
 
-# move model version to production
-client.transition_model_version_stage(
-  name=config['model name']+'__inference',
-  version=model_version,
-  stage='production'
-  )      
+# transition model version to production
+if model.current_stage != "Production":
+  client.transition_model_version_stage(
+    name=config['inference_model_name'],
+    version=model.version,
+    stage='production',
+    archive_existing_versions=True
+    )      
 
 # COMMAND ----------
 
@@ -177,9 +182,63 @@ client.transition_model_version_stage(
 
 # COMMAND ----------
 
+# MAGIC %md Alternatively, we can use the API instead of the UI to [set up the model serving endpoint](https://docs.databricks.com/machine-learning/model-serving/create-manage-serving-endpoints.html#create-model-serving-endpoints). The effect of the following 3 blocks of code is equivalent to the steps described above. We provide this option to showcase automation and to make sure that this notebook can be consistently executed end-to-end.
+# MAGIC 
+# MAGIC Before you can use the Databricks API, you need to create environmental variables named *DATABRICKS_URL* and *DATABRICKS_TOKEN* which must be your workspace url and a valid [personal access token](https://learn.microsoft.com/en-us/azure/databricks/dev-tools/api/latest/authentication). Both values are available from our notebook context - see notebook *0a* for details on how we had retrieved these values.
+
+# COMMAND ----------
+
+# DBTITLE 1,Set Personal Access Token to Access the Model Serving Endpoint
+os.environ['DATABRICKS_TOKEN'] = config["databricks token"]
+os.environ['DATABRICKS_URL'] = config["databricks url"]
+
+# COMMAND ----------
+
+# DBTITLE 1,Define function to create endpoint according to our specification
+def create_endpoint(model_name, model_version):
+  """Create endpoint and wait until the endpoint is ready"""
+  url = f'{os.environ.get("DATABRICKS_URL")}/api/2.0/serving-endpoints'
+  headers = {'Authorization': f'Bearer {os.environ.get("DATABRICKS_TOKEN")}', 
+'Content-Type': 'application/json'}
+  ds_dict = {
+    "name": model_name,
+    "config": {
+     "served_models": [{
+       "model_name": model_name,
+       "model_version": model_version,
+       "workload_size": "Small",
+       "scale_to_zero_enabled": False,
+     }]
+   }
+  }
+  data_json = json.dumps(ds_dict)
+  
+  # deploy endpoint
+  response = requests.request(method='POST', headers=headers, url=url, data=data_json)
+  if response.status_code != 200: 
+    if response.json()["error_code"] != "RESOURCE_ALREADY_EXISTS": # if error is RESOURCE_ALREADY_EXISTS, pass
+      raise Exception(f'Request failed with status {response.status_code}, {response.text}')
+
+  # wait until deployment is ready
+  response = requests.request(method='GET', headers=headers, url=f"{url}/{model_name}")
+  while response.json()["state"]["ready"] != "READY":
+    print("Waiting 30s for deployment to finish")
+    time.sleep(30)
+    response = requests.request(method='GET', headers=headers, url=f"{url}/{model_name}")
+    if response.status_code != 200:
+      raise Exception(f'Request failed with status {response.status_code}, {response.text}')
+  return response.json()
+
+# COMMAND ----------
+
+# DBTITLE 1,Create model serving endpoint
+create_endpoint(config['inference_model_name'], model.version)
+
+# COMMAND ----------
+
 # MAGIC %md ##Step 3: Verify Model Deployment
 # MAGIC 
-# MAGIC Before moving away from the model serving endpoint UI, click the Query Endpoint button in the upper right-hand corner of the UI and copy the Python code in the resulting popup.  You can paste a copy of this code in the cell below:
+# MAGIC Before moving away from the model serving endpoint UI, click the **Query Endpoint** button in the upper right-hand corner of the UI and copy the Python code in the resulting popup.  You can find a snippet of code similar to the cell below. We substituted specifics such as the Databricks url with information from your context so that the code is more robust in the cases of changing workspace or model name.
 
 # COMMAND ----------
 
@@ -194,7 +253,7 @@ def create_tf_serving_json(data):
   return {'inputs': {name: data[name].tolist() for name in data.keys()} if isinstance(data, dict) else data.tolist()}
 
 def score_model(dataset):
-  url = 'https://adb-1883264859880764.4.azuredatabricks.net/serving-endpoints/clickstream/invocations'
+  url = f"{os.environ.get('DATABRICKS_URL')}/serving-endpoints/{config['inference_model_name']}/invocations"
   headers = {'Authorization': f'Bearer {os.environ.get("DATABRICKS_TOKEN")}', 
 'Content-Type': 'application/json'}
   ds_dict = {'dataframe_split': dataset.to_dict(orient='split')} if isinstance(dataset, pd.DataFrame) else create_tf_serving_json(dataset)
@@ -204,15 +263,6 @@ def score_model(dataset):
     raise Exception(f'Request failed with status {response.status_code}, {response.text}')
 
   return response.json()
-
-# COMMAND ----------
-
-# MAGIC %md Before you can run the code above, you need to create an environmental variable named *DATABRICKS_TOKEN* that has been assigned a valid [personal access token](https://learn.microsoft.com/en-us/azure/databricks/dev-tools/api/latest/authentication):
-
-# COMMAND ----------
-
-# DBTITLE 1,Set Personal Access Token to Access the Model Serving Endpoint
-os.environ['DATABRICKS_TOKEN'] = 'dapic57135894fd55c541501569ba9938871'
 
 # COMMAND ----------
 
@@ -236,7 +286,7 @@ score_model(training_pd)
 
 # COMMAND ----------
 
-# MAGIC %md You should notice that unlike the Spark UDF registered in notebook *CS 1b*, the model serving endpoint returns the full array of probabilities, the second of which is the probability of a purchase, the positive class.
+# MAGIC %md You should notice that unlike the Spark UDF registered in notebook *1b*, the model serving endpoint returns the full array of probabilities, the second of which is the probability of a purchase, the positive class.
 
 # COMMAND ----------
 

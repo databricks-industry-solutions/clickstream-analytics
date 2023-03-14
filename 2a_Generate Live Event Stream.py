@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %md The purpose of this notebook is to generate the live stream of event data for use in the Clickstream Propensity solution accelerator.  This notebook was developed on a **Databricks ML 12.1** cluster.
+# MAGIC %md The purpose of this notebook is to generate the live stream of event data for use in the Clickstream Propensity solution accelerator.  You may find this notebook at https://github.com/databricks-industry-solutions/clickstream-analytics
 
 # COMMAND ----------
 
@@ -11,16 +11,18 @@
 
 # MAGIC %md ##Introduction
 # MAGIC 
-# MAGIC In notebook *CS 0b* we partitioned our data into *historical* and *real-time* subsets.  The historical subset represented event data already processed that would be used to train a model that we would apply to "future" records streaming into the environment in "real-time".  The *real-time* subset, representing the last 1 month of the approximately 5 month overall dataset, is the portion of the dataset we will focus on in this notebook.
+# MAGIC In notebook *0b* we partitioned our data into *historical* and *real-time* subsets.  The historical subset represented event data already processed that would be used to train a model that we would apply to "future" records streaming into the environment in "real-time".  The *real-time* subset, representing the last 1 month of the approximately 5 month overall dataset, is the portion of the dataset we will focus on in this notebook.
 # MAGIC 
 # MAGIC To simulate our *real-time* data arriving from a web server, we will stream it to a data ingest layer.  We'll use Azure Event Hubs because they are easy to setup and expose themselves to downstream systems using a standard Kafka API.  So while the transmission of events data to the Event Hub will take on some service-specific elements, the downstream portions of our work found in subsequent notebooks should be broadly recognizable to those familiar with Apache Kafka.
+# MAGIC 
+# MAGIC To setup the Azure Event Hub, you'll need to follow [these steps](https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-create). Be sure to configure a Shared Access Policy with Send and Listen policies on your event hub and record the connection string for that policy in notebook *0a* before running this and subsequent notebooks. Be sure to set the pricing tier of your event hub to Standard or above for use with this demo as the Kafka interface is [not supported](https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-quickstart-kafka-enabled-event-hubs) in the lower level Basic tier.
 # MAGIC 
 # MAGIC **NOTE** This notebook should be running as you run any of the remaining notebooks in this accelerator.
 
 # COMMAND ----------
 
 # DBTITLE 1,Get Config Info
-# MAGIC %run "./CS 0a: Intro & Config"
+# MAGIC %run "./0a_Intro & Config"
 
 # COMMAND ----------
 
@@ -33,13 +35,13 @@ import time
 
 # MAGIC %md ##Step 1: Setup Ingest Layer
 # MAGIC 
-# MAGIC To setup your own Azure Event Hub, please follow [these steps](https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-create). Once you have completed those steps, create a *SAS Policy* with *Send* and *Listen* permissions for your eventhub and copy its connection string associated with the secondary key to the appropriate spot in the *CS 0a* notebook.  Logic in there will break the connection string into the parts needed to connect to the Kafka API endpoint.
+# MAGIC To setup your own Azure Event Hub, please follow [these steps](https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-create). Once you have completed those steps, create a *SAS Policy* with *Send* and *Listen* permissions for your eventhub and copy its connection string associated with the secondary key to the appropriate spot in the *0a* notebook.  Logic in there will break the connection string into the parts needed to connect to the Kafka API endpoint.
 
 # COMMAND ----------
 
 # MAGIC %md ##Step 2: Access Events Data
 # MAGIC 
-# MAGIC We will now retrieve our *real-time* events data separated from the *historical* records in notebook *CS 0b*:
+# MAGIC We will now retrieve our *real-time* events data separated from the *historical* records in notebook *0b*:
 
 # COMMAND ----------
 
