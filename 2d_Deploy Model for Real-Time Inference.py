@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %md The purpose of this notebook is to demonstrate how our trained model can be deployed for real-time model inference. This notebook was developed on a **Databricks 12.3** cluster with **Photon Acceleration** enabled.
+# MAGIC %md The purpose of this notebook is to demonstrate how our trained model can be deployed for real-time model inference. You may find this notebook at https://github.com/databricks-industry-solutions/clickstream-analytics
 
 # COMMAND ----------
 
@@ -133,6 +133,10 @@ training_set = fs.create_training_set(
 # COMMAND ----------
 
 # DBTITLE 1,Retrieve Model
+# set mlflow experiment
+username = dbutils.notebook.entry_point.getDbutils().notebook().getContext().userName().get()
+mlflow.set_experiment('/Users/{}/clickstream'.format(username))
+
 # connect to mlflow
 client = mlflow.tracking.MlflowClient()
 

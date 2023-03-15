@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %md The purpose of this notebook is to process streaming data and write real-time features for use in inference scenarios with the Clickstream Propensity solution accelerator. This notebook was developed on a cluster with **Photon Acceleration** enabled.
+# MAGIC %md The purpose of this notebook is to process streaming data and write real-time features for use in inference scenarios with the Clickstream Propensity solution accelerator. You may find this notebook at https://github.com/databricks-industry-solutions/clickstream-analytics
 
 # COMMAND ----------
 
@@ -11,9 +11,9 @@
 
 # MAGIC %md ##Important Note
 # MAGIC 
-# MAGIC In the last step of this notebook, we will be publishing data to an Azure CosmosDB document store. If you run this notebook as part of the job created by the **RUNME** notebook, or using the `clickstream_photon_cluster` cluster created by the **RUNME** notebook, the cluster is already configured with the necessary packages.  If you used your own cluster and wish to avoid restarting your cluster later on, you may wish to jump to the last step, *Step 4*, and complete the CosmosDB deployment and integration actions before running this notebook.
+# MAGIC In the last step of this notebook, we will be publishing data to an Azure CosmosDB document store. If you run this notebook as part of the job created by the **RUNME** notebook, or using the `clickstream_photon_cluster` cluster created by the **RUNME** notebook, the cluster is already configured with the necessary packages.  If you use your own cluster and wish to avoid restarting your cluster later on, you may wish to jump to the last step, *Step 4*, and complete the CosmosDB deployment and integration actions before running this notebook.
 # MAGIC 
-# MAGIC Also see **RUNME** notebook for details about setting up the secret scopes for your CosmosDB URI and secrets.
+# MAGIC Also see the **RUNME** notebook for details about setting up the secret scopes for your CosmosDB URI and secrets.
 
 # COMMAND ----------
 
@@ -635,7 +635,7 @@ _ = fs.publish_table(
   mode = 'merge', 
   streaming= True,
   checkpoint_location = f"{config['checkpoint_path']}/electronics_cart_metrics__inference_online",
-  trigger={'processingTime': '0 seconds'}
+  trigger={'processingTime': '30 seconds'}
   )
 
 # COMMAND ----------
@@ -647,7 +647,7 @@ _ = fs.publish_table(
   mode = 'merge',
   streaming= True,
   checkpoint_location = f"{config['checkpoint_path']}/electronics_cart_product_metrics__inference_online",
-  trigger={'processingTime': '0 seconds'}
+  trigger={'processingTime': '30 seconds'}
   )
 
 # COMMAND ----------

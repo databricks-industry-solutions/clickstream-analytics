@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %md The purpose of this notebook is to process streaming, real-time data and write features in batch for use in inference scenarios with the Clickstream Propensity solution accelerator.  This notebook was developed on a **Databricks 12.3** cluster with **Photon Acceleration** enabled.
+# MAGIC %md The purpose of this notebook is to process streaming, real-time data and write features in batch for use in inference scenarios with the Clickstream Propensity solution accelerator.  You may find this notebook at https://github.com/databricks-industry-solutions/clickstream-analytics
 
 # COMMAND ----------
 
