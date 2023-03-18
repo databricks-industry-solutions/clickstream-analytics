@@ -577,13 +577,15 @@ print(f"cosmosdb_uri:\t{config['cosmosdb_uri']}")
 
 # COMMAND ----------
 
-# MAGIC %md Before proceeding, it's a good idea to make sure you've configured your Databricks cluster to use the latest [Azure Cosmos DB Spark 3 OLTP Connector for SQL API](https://github.com/Azure/azure-sdk-for-java/blob/main/sdk/cosmos/azure-cosmos-spark_3-2_2-12/README.md#download).  As a Java JAR, it must be installed as either a [cluster or workspace library](https://learn.microsoft.com/en-us/azure/databricks/libraries/). For ease of installation, we'd recommend installing it as a workspace library and linking it to your cluster. 
+# MAGIC %md Before proceeding, it's a good idea to make sure you've configured your Databricks cluster to use the latest [Azure Cosmos DB Spark 3 OLTP Connector for SQL API](https://github.com/Azure/azure-sdk-for-java/blob/main/sdk/cosmos/azure-cosmos-spark_3-2_2-12/README.md#download).  As a Java JAR, it must be installed as either a [cluster or workspace library](https://learn.microsoft.com/en-us/azure/databricks/libraries/). 
 # MAGIC 
 # MAGIC **NOTE** At the time of development, the latest connector was *azure-cosmos-spark_3-3_2-12 version 4.17.0*. 
 
 # COMMAND ----------
 
-# MAGIC %md With the Azure CosmosDB document store deployed and the library installed, we now need to record the read-only and read-write authentication keys for the store as [Databricks secrets](https://learn.microsoft.com/en-us/azure/databricks/security/secrets/secrets#create-a-secret-in-a-databricks-backed-scope). In an Azure environment, you can create either a Databricks-backed scope or an Azure Key Vault scope.  In this demo, we have employed a Databricks-backed scope to keep things simpler.
+# MAGIC %md 
+# MAGIC # TODO: remove the CLI part of this instruction because we provide API script for setting up secret scope; keep the discussion around concepts 
+# MAGIC With the Azure CosmosDB document store deployed and the library installed, we now need to record the read-only and read-write authentication keys for the store as [Databricks secrets](https://learn.microsoft.com/en-us/azure/databricks/security/secrets/secrets#create-a-secret-in-a-databricks-backed-scope). In an Azure environment, you can create either a Databricks-backed scope or an Azure Key Vault scope.  In this demo, we have employed a Databricks-backed scope to keep things simpler.
 # MAGIC 
 # MAGIC To setup a secret, you need to make use of the Databricks CLI. To use the CLI, you first need to install and configure it to your local system, and to do that, you'll need to follow the instructions provided [here](https://learn.microsoft.com/en-us/azure/databricks/dev-tools/cli/). (While the CLI runs on your local system, it creates the secrets in the environment for which it has been configured.  It is critical that you configure your installation of the Databricks CLI to point to the environment where you are running these notebooks.)
 # MAGIC 
@@ -600,7 +602,7 @@ print(f"cosmosdb_uri:\t{config['cosmosdb_uri']}")
 # MAGIC databricks secrets put --scope clickstream-readonly --key onlinefs-authorization-key
 # MAGIC databricks secrets put --scope clickstream-readwrite --key onlinefs-authorization-key
 # MAGIC ```
-# MAGIC As you enter each command, you will be prompted to select a text editor.  Choose the one you are most familiar with and follow the instructions, pasting the appropriate CosmosDB authentication key in each. Be sure to record your scope names and prefix in notebook *CS0a*.
+# MAGIC As you enter each command, you will be prompted to select a text editor.  Choose the one you are most familiar with and follow the instructions, pasting the appropriate CosmosDB authentication key in each. Be sure to record your scope names and prefix in notebook *0a*.
 
 # COMMAND ----------
 
@@ -630,12 +632,12 @@ online_store_spec = AzureCosmosDBSpec(
 
 # DBTITLE 1,Publish Cart Metrics
 _ = fs.publish_table(
-  f"{config['database']}.electronics_cart_metrics__inference", # offline feature store table where features come from 
+  f"{config['database']}.electronics_cart_metrics__inference", # offline feature store table where features come from  
   online_store_spec, # specs for connecting to online feature store
   mode = 'merge', 
   streaming= True,
   checkpoint_location = f"{config['checkpoint_path']}/electronics_cart_metrics__inference_online",
-  trigger={'processingTime': '30 seconds'}
+  trigger={'processingTime': '0 seconds'}
   )
 
 # COMMAND ----------
@@ -647,7 +649,7 @@ _ = fs.publish_table(
   mode = 'merge',
   streaming= True,
   checkpoint_location = f"{config['checkpoint_path']}/electronics_cart_product_metrics__inference_online",
-  trigger={'processingTime': '30 seconds'}
+  trigger={'processingTime': '0 seconds'}
   )
 
 # COMMAND ----------

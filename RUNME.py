@@ -203,6 +203,18 @@ job_json = {
                     {
                         "task_key": "clickstream_1b"
                     }
+                ],
+                "libraries": [
+                    {
+                        "maven": {
+                            "coordinates": "org.apache.kafka:kafka-clients:3.4.0" 
+                        }
+                    },
+                    {
+                      "maven": {
+                          "coordinates": "com.azure.cosmos.spark:azure-cosmos-spark_3-3_2-12:4.17.0" 
+                      }
+                    }
                 ]
             },
             {
@@ -213,7 +225,7 @@ job_json = {
                 "task_key": "clickstream_2d",
                 "depends_on": [
                     {
-                        "task_key": "clickstream_1b"
+                        "task_key": "clickstream_2c"
                     }
                 ]
             }
@@ -243,8 +255,8 @@ job_json = {
                   "spark_conf": {
                       "spark.databricks.delta.formatCheck.enabled": "false"
                   },
-                  "num_workers": 4,
-                  "node_type_id": {"AWS": "i3.2xlarge", "MSA": "Standard_DS3_v2", "GCP": "n1-highmem-4"},
+                  "num_workers": 5,
+                  "node_type_id": {"AWS": "i3.xlarge", "MSA": "Standard_DS3_v2", "GCP": "n1-highmem-4"},
                   "custom_tags": {
                       "usage": "solacc_testing",
                       "group": "RCG",
