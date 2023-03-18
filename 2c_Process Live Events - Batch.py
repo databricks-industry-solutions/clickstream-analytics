@@ -1,17 +1,17 @@
 # Databricks notebook source
-# MAGIC %md The purpose of this notebook is to process streaming, real-time data and write features in batch for use in inference scenarios with the Clickstream Propensity solution accelerator.  This notebook was developed on a **Databricks 12.3** cluster with **Photon Acceleration** enabled.
+# MAGIC %md The purpose of this notebook is to process streaming, real-time data and write features in batch for use in inference scenarios with the Clickstream Propensity solution accelerator.  You may find this notebook at https://github.com/databricks-industry-solutions/clickstream-analytics
 
 # COMMAND ----------
 
 # MAGIC %md ##Important Note
 # MAGIC 
-# MAGIC This notebook should be running in parallel with notebook *CS 2a*.
+# MAGIC This notebook should be running in parallel with notebook *2a*.
 
 # COMMAND ----------
 
 # MAGIC %md ##Introduction
 # MAGIC 
-# MAGIC Previously, we wrote historical event data to our lakehouse and from that data derived a set of features used to train a model. In this notebook, we will use the streaming event data to derive features in batch for those features we previously identified as only needing to be recalculated at midnight each day.  Those feature sets include our user, product and user-product features. (Cart and cart-product features are addressed in notebook *CS 2b*.)
+# MAGIC Previously, we wrote historical event data to our lakehouse and from that data derived a set of features used to train a model. In this notebook, we will use the streaming event data to derive features in batch for those features we previously identified as only needing to be recalculated at midnight each day.  Those feature sets include our user, product and user-product features. (Cart and cart-product features are addressed in notebook *2b*.)
 # MAGIC 
 # MAGIC As part of this work, we will be recording feature data to the Databricks feature store. Because we are using a Databricks standard (not ML) cluster for this work, we must install the feature store library before getting started with our principal work:
 
@@ -23,7 +23,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,Get Config Info
-# MAGIC %run "./CS 0a: Intro & Config"
+# MAGIC %run "./0a_Intro & Config"
 
 # COMMAND ----------
 
@@ -43,7 +43,7 @@ from delta.tables import *
 
 # MAGIC %md ##Step 1: Configure Gold Layer
 # MAGIC 
-# MAGIC In notebook *CS 2b* we addressed the setup of our Bronze and Silver layer tables.  We will use the event data persisted to the Silver-layer in that notebook as the starting point for writing our Gold-layer user, product and user-product feature tables:
+# MAGIC In notebook *2b* we addressed the setup of our Bronze and Silver layer tables.  We will use the event data persisted to the Silver-layer in that notebook as the starting point for writing our Gold-layer user, product and user-product feature tables:
 
 # COMMAND ----------
 
@@ -245,8 +245,12 @@ last_event_date = datetime.strptime('1970-01-01','%Y-%m-%d')
 # COMMAND ----------
 
 # DBTITLE 1,Poll Event Data to Trigger Feature Generation
-# loop indefinetly
-while 1==1:
+import time
+timeout_start = time.time()
+
+while time.time() < timeout_start + 1800: # to prevent you from forgetting to turn off this loop, we cap the execution for 3 cycles
+
+# while True: # use this while condition if you want to leave the loop running indefinitely
   
   # poll silver table for last observed time
   event_date = (
@@ -279,3 +283,7 @@ while 1==1:
 # COMMAND ----------
 
 # MAGIC %md © 2023 Databricks, Inc. All rights reserved. The source in this notebook is provided subject to the Databricks License.
+
+# COMMAND ----------
+
+

@@ -1,26 +1,11 @@
 # Databricks notebook source
-# MAGIC %md The purpose of this notebook is to prepare the data for use in the Clickstream Propensity solution accelerator.  This notebook was developed on a **Databricks ML 12.1** cluster.
+# MAGIC %md The purpose of this notebook is to prepare the data for use in the Clickstream Propensity solution accelerator.  You may find this notebook at https://github.com/databricks-industry-solutions/clickstream-analytics
 
 # COMMAND ----------
 
 # MAGIC %md ##Introduction
 # MAGIC 
 # MAGIC In this notebook, we will access the ecommerce events data around which we will train our model and simulate live user activity on a website.  The data set we will use will be divided into *historical* and *real-time* portions to be used in different parts of our work.  In addition to the partitioning of the dataset, we will spend some time examining the data so that decisions made during feature engineering and model training might be clearer. 
-
-# COMMAND ----------
-
-# DBTITLE 1,Get Config Info
-# MAGIC %run "./CS 0a: Intro & Config"
-
-# COMMAND ----------
-
-# DBTITLE 1,Import Required Libraries
-from pyspark.sql.types import *
-import pyspark.sql.functions as fn
-
-from databricks import feature_store
-
-import time
 
 # COMMAND ----------
 
@@ -43,7 +28,27 @@ import time
 # MAGIC 
 # MAGIC This information is not representative of a raw clickstream as would be generated from a web server but instead represents filtered and enhanced data that could be derived with some downstream processing of the raw weblogs in combination with information about products in the company's product catalog. If you are interested in implementing a solution like the one demonstrated in these notebooks, you'll need to carefully examine the information available to you to determine how you might generate a similar dataset. (Raw web server logs are rarely made available for public use so this is an on-going challenge in any demonstration of analytics on online data. That said, the more condensed nature of this data set will allow us to focus on the more immediate challenges related to model training and inference.)
 # MAGIC 
-# MAGIC To make this data accessible, you will need to download it from the Kaggle website, unzip it, and upload it to a storage container accessible to your Databricks environment.  We have elected to upload this to a [mount point](https://docs.databricks.com/dbfs/mounts.html) accessible as */mnt/clickstream* under a folder named *electronics*.  If you wish to upload your data to a different file location, please change the appropriate configuration settings under the *CS 0a* notebook.
+# MAGIC To make this data accessible, we have provided a script to download it from Kaggle and extract it to the `events_path`. You need to set up your Kaggle credentials for the download to work - check out the `RUNME` notebook after you import these notebooks for detailed instructions. If you wish to download your data to a different file location, please change the appropriate configuration settings under the *0a* notebook.
+
+# COMMAND ----------
+
+# DBTITLE 1,Download and Extract Source Data
+# MAGIC %run ./util/data-extract
+
+# COMMAND ----------
+
+# DBTITLE 1,Get Config Info
+# MAGIC %run "./0a_Intro & Config"
+
+# COMMAND ----------
+
+# DBTITLE 1,Import Required Libraries
+from pyspark.sql.types import *
+import pyspark.sql.functions as fn
+
+from databricks import feature_store
+
+import time
 
 # COMMAND ----------
 
@@ -157,26 +162,11 @@ display(
 # DBTITLE 1,Reset Database
 # drop feature store tables
 fs = feature_store.FeatureStoreClient()
-try:
-  _ = fs.drop_table('electronics_cart_metrics__inference')
-except:
-  pass
-try:
-  _ = fs.drop_table('electronics_cart_product_metrics__inference')
-except:
-  pass
-try:
-  _ = fs.drop_table('electronics_user_metrics__inference')
-except:
-  pass
-try:
-  _ = fs.drop_table('electronics_product_metrics__inference')
-except:
-  pass
-try:
-  _ = fs.drop_table('electronics_user_product_metrics__inference')
-except:
-  pass
+for table in ['electronics_cart_metrics__inference', 'electronics_cart_product_metrics__inference', 'electronics_user_metrics__inference', 'electronics_product_metrics__inference', 'electronics_user_product_metrics__inference']: 
+  try:
+    _ = fs.drop_table(table)
+  except:
+    pass
 
 # reset the database
 _ = spark.sql(f"DROP DATABASE IF EXISTS {config['database']} CASCADE")

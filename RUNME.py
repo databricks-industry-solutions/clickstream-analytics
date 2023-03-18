@@ -33,7 +33,13 @@ from solacc.companion import NotebookSolutionCompanion
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC Before setting up the rest of the accelerator, we need set up a few credentials in order to access Kaggle datasets. Grab an API key for your Kaggle account ([documentation](https://www.kaggle.com/docs/api#getting-started-installation-&-authentication) here). Here we demonstrate using the [Databricks Secret Scope](https://docs.databricks.com/security/secrets/secret-scopes.html) for credential management. 
+# MAGIC Before setting up the rest of the accelerator, we need set up a few credentials in order to access the source dataset and other cloud infrastructure dependencies. Here we demonstrate using the [Databricks Secret Scope](https://docs.databricks.com/security/secrets/secret-scopes.html) for credential management. 
+# MAGIC 
+# MAGIC In order to access the source dataset from Kaggle, grab an API key for your Kaggle account ([documentation](https://www.kaggle.com/docs/api#getting-started-installation-&-authentication) here). 
+# MAGIC 
+# MAGIC Notebook *2a* uses an Azure Event Hub. To setup the Azure Event Hub, you'll need to follow [these steps](https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-create). Be sure to configure a Shared Access Policy with Send and Listen policies on your event hub and record the connection string for that policy here before running the accelerator. Be sure to set the pricing tier of your event hub to Standard or above for use with this demo as the Kafka interface is [not supported](https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-quickstart-kafka-enabled-event-hubs) in the lower level Basic tier.
+# MAGIC 
+# MAGIC Notebook *2b* uses an Azure CosmosDB. The steps for deploying an Azure CosmosDB document store are found [here](https://learn.microsoft.com/en-us/azure/cosmos-db/nosql/quickstart-portal). Once your CosmosDB document store has been deployed, be sure to get one [authorization key](https://learn.microsoft.com/en-us/azure/cosmos-db/secure-access-to-data?tabs=using-primary-key#primary-keys) from the CosmosDB service with read-only access to the store and another with read-write access to the store. You will also need to capture the CosmosDB URI.
 # MAGIC 
 # MAGIC Copy the block of code below, replace the name the secret scope and fill in the credentials and execute the block. After executing the code, The accelerator notebook will be able to access the credentials it needs.
 # MAGIC 
@@ -55,6 +61,39 @@ from solacc.companion import NotebookSolutionCompanion
 # MAGIC   "key": "kaggle_key",
 # MAGIC   "string_value": "____"
 # MAGIC })
+# MAGIC 
+# MAGIC client.execute_post_json(f"{client.endpoint}/api/2.0/secrets/put", {
+# MAGIC   "scope": "solution-accelerator-cicd",
+# MAGIC   "key": "event_hub_sas_policy_connection_string",
+# MAGIC   "string_value": '____' 
+# MAGIC })
+# MAGIC 
+# MAGIC client.execute_post_json(f"{client.endpoint}/api/2.0/secrets/put", {
+# MAGIC   "scope": "solution-accelerator-cicd",
+# MAGIC   "key": "cosmosdb_uri",
+# MAGIC   "string_value": '____'
+# MAGIC })
+# MAGIC 
+# MAGIC try:
+# MAGIC   client.execute_post_json(f"{client.endpoint}/api/2.0/secrets/scopes/create", {"scope": "clickstream-readonly"})
+# MAGIC except:
+# MAGIC   pass
+# MAGIC client.execute_post_json(f"{client.endpoint}/api/2.0/secrets/put", {
+# MAGIC   "scope": "clickstream-readonly", 
+# MAGIC   "key": "onlinefs-authorization-key",
+# MAGIC   "string_value": "____"
+# MAGIC })
+# MAGIC 
+# MAGIC try:
+# MAGIC   client.execute_post_json(f"{client.endpoint}/api/2.0/secrets/scopes/create", {"scope": "clickstream-readwrite"})
+# MAGIC except:
+# MAGIC   pass
+# MAGIC client.execute_post_json(f"{client.endpoint}/api/2.0/secrets/put", {
+# MAGIC   "scope": "clickstream-readwrite", 
+# MAGIC   "key": "onlinefs-authorization-key",
+# MAGIC   "string_value": "____"
+# MAGIC })
+# MAGIC 
 # MAGIC ```
 
 # COMMAND ----------
@@ -64,25 +103,129 @@ job_json = {
         "max_concurrent_runs": 1,
         "tags": {
             "usage": "solacc_testing",
-            "group": "SOLACC"
+            "group": "RCG",
+            "accelerator": "clickstream"
         },
         "tasks": [
             {
                 "job_cluster_key": "clickstream_cluster",
                 "notebook_task": {
-                    "notebook_path": f"01_Introduction_And_Setup"
+                    "notebook_path": f"0a_Intro & Config"
                 },
-                "task_key": "clickstream_01"
+                "task_key": "clickstream_0a"
             },
             {
                 "job_cluster_key": "clickstream_cluster",
                 "notebook_task": {
-                    "notebook_path": f"02_Analysis"
+                    "notebook_path": f"0b_Prepare Data"
                 },
-                "task_key": "clickstream_02",
+                "task_key": "clickstream_0b",
                 "depends_on": [
                     {
-                        "task_key": "clickstream_01"
+                        "task_key": "clickstream_0a"
+                    }
+                ]
+            },
+            {
+                "job_cluster_key": "clickstream_cluster",
+                "notebook_task": {
+                    "notebook_path": f"1a_Publish Historical Data"
+                },
+                "task_key": "clickstream_1a",
+                "depends_on": [
+                    {
+                        "task_key": "clickstream_0b"
+                    }
+                ]
+            },
+            {
+                "job_cluster_key": "clickstream_cluster",
+                "notebook_task": {
+                    "notebook_path": f"1b_Train Model on Historical Data"
+                },
+                "task_key": "clickstream_1b",
+                "depends_on": [
+                    {
+                        "task_key": "clickstream_1a"
+                    }
+                ]
+            },
+            {
+                "job_cluster_key": "clickstream_photon_cluster",
+                "notebook_task": {
+                    "notebook_path": f"2a_Generate Live Event Stream"
+                },
+                "task_key": "clickstream_2a",
+                "depends_on": [
+                    {
+                        "task_key": "clickstream_1b"
+                    }
+                ],
+                "libraries": [
+                    {
+                        "maven": {
+                            "coordinates": "org.apache.kafka:kafka-clients:3.4.0"
+                        }
+                    }
+                ]
+            },
+            {
+                "job_cluster_key": "clickstream_photon_cluster",
+                "notebook_task": {
+                    "notebook_path": f"2b_Process Live Events - Streaming"
+                },
+                "task_key": "clickstream_2b",
+                "depends_on": [
+                    {
+                        "task_key": "clickstream_1b"
+                    }
+                ],
+                "libraries": [
+                    {
+                        "maven": {
+                            "coordinates": "org.apache.kafka:kafka-clients:3.4.0" 
+                        }
+                    },
+                    {
+                      "maven": {
+                          "coordinates": "com.azure.cosmos.spark:azure-cosmos-spark_3-3_2-12:4.17.0" 
+                      }
+                    }
+                ]
+            },
+            {
+                "job_cluster_key": "clickstream_photon_cluster",
+                "notebook_task": {
+                    "notebook_path": f"2c_Process Live Events - Batch"
+                },
+                "task_key": "clickstream_2c",
+                "depends_on": [
+                    {
+                        "task_key": "clickstream_1b"
+                    }
+                ],
+                "libraries": [
+                    {
+                        "maven": {
+                            "coordinates": "org.apache.kafka:kafka-clients:3.4.0" 
+                        }
+                    },
+                    {
+                      "maven": {
+                          "coordinates": "com.azure.cosmos.spark:azure-cosmos-spark_3-3_2-12:4.17.0" 
+                      }
+                    }
+                ]
+            },
+            {
+                "job_cluster_key": "clickstream_photon_cluster",
+                "notebook_task": {
+                    "notebook_path": f"2d_Deploy Model for Real-Time Inference"
+                },
+                "task_key": "clickstream_2d",
+                "depends_on": [
+                    {
+                        "task_key": "clickstream_2c"
                     }
                 ]
             }
@@ -91,17 +234,36 @@ job_json = {
             {
                 "job_cluster_key": "clickstream_cluster",
                 "new_cluster": {
-                    "spark_version": "12.1.x-cpu-ml-scala2.12",
+                    "spark_version": "12.2.x-cpu-ml-scala2.12",
                 "spark_conf": {
                     "spark.databricks.delta.formatCheck.enabled": "false"
                     },
                     "num_workers": 2,
                     "node_type_id": {"AWS": "i3.xlarge", "MSA": "Standard_DS3_v2", "GCP": "n1-highmem-4"},
                     "custom_tags": {
-                        "usage": "solacc_testing"
+                        "usage": "solacc_testing",
+                        "group": "RCG",
+                        "accelerator": "clickstream"
                     },
                 }
-            }
+            },
+            {
+              "job_cluster_key": "clickstream_photon_cluster",
+              "new_cluster": {
+                  "spark_version": "12.2.x-scala2.12",
+                  "runtime_engine": "PHOTON",
+                  "spark_conf": {
+                      "spark.databricks.delta.formatCheck.enabled": "false"
+                  },
+                  "num_workers": 5,
+                  "node_type_id": {"AWS": "i3.xlarge", "MSA": "Standard_DS3_v2", "GCP": "n1-highmem-4"},
+                  "custom_tags": {
+                      "usage": "solacc_testing",
+                      "group": "RCG",
+                      "accelerator": "clickstream"
+                  },
+              }
+          }
         ]
     }
 

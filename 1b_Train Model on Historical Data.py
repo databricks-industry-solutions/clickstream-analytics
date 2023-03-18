@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %md The purpose of this notebook is train the model for the Clickstream Propensity solution accelerator.  This notebook was developed on a **Databricks ML 12.1** cluster.
+# MAGIC %md The purpose of this notebook is train the model for the Clickstream Propensity solution accelerator.  You may find this notebook at https://github.com/databricks-industry-solutions/clickstream-analytics
 
 # COMMAND ----------
 
@@ -281,6 +281,10 @@ test_pd_broadcast = sc.broadcast(test.toPandas())
 # COMMAND ----------
 
 # DBTITLE 1,Explore Search Space
+# set mlflow experiment so that this block works in a job
+username = dbutils.notebook.entry_point.getDbutils().notebook().getContext().userName().get()
+mlflow.set_experiment('/Users/{}/clickstream'.format(username))
+
 # perform evaluation
 with mlflow.start_run(run_name='tuning'):
   

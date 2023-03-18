@@ -1,23 +1,25 @@
 # Databricks notebook source
-# MAGIC %md The purpose of this notebook is to process streaming data and write real-time features for use in inference scenarios with the Clickstream Propensity solution accelerator. This notebook was developed on a **Databricks 12.3** cluster with **Photon Acceleration** enabled.
+# MAGIC %md The purpose of this notebook is to process streaming data and write real-time features for use in inference scenarios with the Clickstream Propensity solution accelerator. You may find this notebook at https://github.com/databricks-industry-solutions/clickstream-analytics
 
 # COMMAND ----------
 
 # MAGIC %md ##Important Note
 # MAGIC 
-# MAGIC This notebook should be running in parallel with notebook *CS 2a*.
+# MAGIC This notebook should be running in parallel with notebook *2a*.
 
 # COMMAND ----------
 
 # MAGIC %md ##Important Note
 # MAGIC 
-# MAGIC In the last step of this notebook, we will be publishing data to an Azure CosmosDB document store.  **If you wish to avoid restarting your cluster later on, you may wish to jump to the last step, *Step 4*, and complete the CosmosDB deployment and integration actions before running this notebook.**  Information about your CosmosDB URI and the secrets used to hold the keys used to access the service should be recorded in notebook *CS 0a*.
+# MAGIC In the last step of this notebook, we will be publishing data to an Azure CosmosDB document store. If you run this notebook as part of the job created by the **RUNME** notebook, or using the `clickstream_photon_cluster` cluster created by the **RUNME** notebook, the cluster is already configured with the necessary packages.  If you use your own cluster and wish to avoid restarting your cluster later on, you may wish to jump to the last step, *Step 4*, and complete the CosmosDB deployment and integration actions before running this notebook.
+# MAGIC 
+# MAGIC Also see the **RUNME** notebook for details about setting up the secret scopes for your CosmosDB URI and secrets.
 
 # COMMAND ----------
 
 # MAGIC %md ##Introduction
 # MAGIC 
-# MAGIC Previously, we wrote historical event data to our lakehouse and from that data derived a set of features used to train a model. In this notebook, we will use the streaming event data to derive features in real-time for those features we previously identified as requiring updated state information with each click.  Those feature sets include our cart and cart-product features.  (User, product and user-product features are addressed in notebook *CS 2c*.)
+# MAGIC Previously, we wrote historical event data to our lakehouse and from that data derived a set of features used to train a model. In this notebook, we will use the streaming event data to derive features in real-time for those features we previously identified as requiring updated state information with each click.  Those feature sets include our cart and cart-product features.  (User, product and user-product features are addressed in notebook *2c*.)
 # MAGIC 
 # MAGIC As part of this work, we will be recording feature data to the Databricks feature store. Because we are using a Databricks standard (not ML) cluster for this work, we must install the feature store library before getting started with our principal work:
 
@@ -29,24 +31,20 @@
 # COMMAND ----------
 
 # DBTITLE 1,Get Config Info
-# MAGIC %run "./CS 0a: Intro & Config"
+# MAGIC %run "./0a_Intro & Config"
 
 # COMMAND ----------
 
 # DBTITLE 1,Import Required Libraries
 import pyspark.sql.functions as fn
 from pyspark.sql.types import *
-
 from databricks import feature_store
 from databricks.feature_store.online_store_spec import AzureCosmosDBSpec
-
 from delta.tables import *
-
 import pandas as pd
-
 from datetime import timedelta, datetime
-
 from typing import Iterator
+import time
 
 # COMMAND ----------
 
@@ -568,7 +566,7 @@ fs.register_table(
 # MAGIC * the Core (SQL) API (aka *Azure Cosmos DB for NoSQL*) should be specified during CosmosDB deployment
 # MAGIC * network connectivity should be set to *All Networks* on the CosmosDB service so that the Databricks service can communicate directly to it
 # MAGIC 
-# MAGIC Once your CosmosDB document store has been deployed, be sure to get one [authorization key](https://learn.microsoft.com/en-us/azure/cosmos-db/secure-access-to-data?tabs=using-primary-key#primary-keys) from the CosmosDB service with read-only access to the store and another with read-write access to the store. You'll need these in later steps.  You will also need to capture the CosmosDB URI and record it in notebook *CS 0a*.
+# MAGIC Once your CosmosDB document store has been deployed, be sure to get one [authorization key](https://learn.microsoft.com/en-us/azure/cosmos-db/secure-access-to-data?tabs=using-primary-key#primary-keys) from the CosmosDB service with read-only access to the store and another with read-write access to the store. You'll need these in later steps.  You will also need to capture the CosmosDB URI and set it up in a secret scope (see *RUNME* notebook).
 # MAGIC 
 # MAGIC **NOTE** It's important to note that the CosmosDB database uses 4,000 RU/s for its default throughput. RU/s (request units per second) are explained [here](https://learn.microsoft.com/en-us/azure/cosmos-db/request-units).  You'll need to configure a value appropriate for your needs.  If you experience 429 errors from the service, this is an indication you are pushing more data to CosmosDB than it is configured to handle and you may need to raise the RU/s to keep up.  For this demo running with a speed factor of 100, we sized our database for 1,000 RU/s and did not appear to have any problems.
 
@@ -579,13 +577,15 @@ print(f"cosmosdb_uri:\t{config['cosmosdb_uri']}")
 
 # COMMAND ----------
 
-# MAGIC %md Before proceeding, it's a good idea to make sure you've configured your Databricks cluster to use the latest [Azure Cosmos DB Spark 3 OLTP Connector for SQL API](https://github.com/Azure/azure-sdk-for-java/blob/main/sdk/cosmos/azure-cosmos-spark_3-2_2-12/README.md#download).  As a Java JAR, it must be installed as either a [cluster or workspace library](https://learn.microsoft.com/en-us/azure/databricks/libraries/). For ease of installation, we'd recommend installing it as a workspace library and linking it to your cluster. 
+# MAGIC %md Before proceeding, it's a good idea to make sure you've configured your Databricks cluster to use the latest [Azure Cosmos DB Spark 3 OLTP Connector for SQL API](https://github.com/Azure/azure-sdk-for-java/blob/main/sdk/cosmos/azure-cosmos-spark_3-2_2-12/README.md#download).  As a Java JAR, it must be installed as either a [cluster or workspace library](https://learn.microsoft.com/en-us/azure/databricks/libraries/). 
 # MAGIC 
 # MAGIC **NOTE** At the time of development, the latest connector was *azure-cosmos-spark_3-3_2-12 version 4.17.0*. 
 
 # COMMAND ----------
 
-# MAGIC %md With the Azure CosmosDB document store deployed and the library installed, we now need to record the read-only and read-write authentication keys for the store as [Databricks secrets](https://learn.microsoft.com/en-us/azure/databricks/security/secrets/secrets#create-a-secret-in-a-databricks-backed-scope). In an Azure environment, you can create either a Databricks-backed scope or an Azure Key Vault scope.  In this demo, we have employed a Databricks-backed scope to keep things simpler.
+# MAGIC %md 
+# MAGIC # TODO: remove the CLI part of this instruction because we provide API script for setting up secret scope; keep the discussion around concepts 
+# MAGIC With the Azure CosmosDB document store deployed and the library installed, we now need to record the read-only and read-write authentication keys for the store as [Databricks secrets](https://learn.microsoft.com/en-us/azure/databricks/security/secrets/secrets#create-a-secret-in-a-databricks-backed-scope). In an Azure environment, you can create either a Databricks-backed scope or an Azure Key Vault scope.  In this demo, we have employed a Databricks-backed scope to keep things simpler.
 # MAGIC 
 # MAGIC To setup a secret, you need to make use of the Databricks CLI. To use the CLI, you first need to install and configure it to your local system, and to do that, you'll need to follow the instructions provided [here](https://learn.microsoft.com/en-us/azure/databricks/dev-tools/cli/). (While the CLI runs on your local system, it creates the secrets in the environment for which it has been configured.  It is critical that you configure your installation of the Databricks CLI to point to the environment where you are running these notebooks.)
 # MAGIC 
@@ -602,7 +602,7 @@ print(f"cosmosdb_uri:\t{config['cosmosdb_uri']}")
 # MAGIC databricks secrets put --scope clickstream-readonly --key onlinefs-authorization-key
 # MAGIC databricks secrets put --scope clickstream-readwrite --key onlinefs-authorization-key
 # MAGIC ```
-# MAGIC As you enter each command, you will be prompted to select a text editor.  Choose the one you are most familiar with and follow the instructions, pasting the appropriate CosmosDB authentication key in each. Be sure to record your scope names and prefix in notebook *CS0a*.
+# MAGIC As you enter each command, you will be prompted to select a text editor.  Choose the one you are most familiar with and follow the instructions, pasting the appropriate CosmosDB authentication key in each. Be sure to record your scope names and prefix in notebook *0a*.
 
 # COMMAND ----------
 
@@ -613,7 +613,7 @@ print(f"secret_prefix:\t{config['secret_prefix']}")
 
 # COMMAND ----------
 
-# MAGIC %md With the service behind our online feature store deployed and configuration settings used to connect us to this service captured in notebook *CS 0a*, we can now define our online feature store specification:
+# MAGIC %md With the service behind our online feature store deployed and configuration settings used to connect us to this service captured in notebook *0a*, we can now define our online feature store specification:
 
 # COMMAND ----------
 
@@ -632,7 +632,7 @@ online_store_spec = AzureCosmosDBSpec(
 
 # DBTITLE 1,Publish Cart Metrics
 _ = fs.publish_table(
-  f"{config['database']}.electronics_cart_metrics__inference", # offline feature store table where features come from 
+  f"{config['database']}.electronics_cart_metrics__inference", # offline feature store table where features come from  
   online_store_spec, # specs for connecting to online feature store
   mode = 'merge', 
   streaming= True,
@@ -685,6 +685,16 @@ _ = fs.publish_table(
 # MAGIC For the offline feature tables, this is pretty straightforward.  Simply write a [DELETE](https://docs.databricks.com/sql/language-manual/delta-delete-from.html) statement with an appropriate filter such as *event_time < 'YYYY-MM-DD'* where *YYYY-MM-DD* is the string representation of a date far enough back in time that the session could not be valid/relevant.
 # MAGIC 
 # MAGIC For the online feature tables, this is a bit trickier.  For this, we can set a time to live (TTL) on the container which serves as a default policy.  After the number of time to live seconds has expired on any given document, that document will be removed from the container through a background process that the Azure service runs for us.  You could do something more sophisticated by calculating a TTL for each individual feature record which the service would then honor but this might be overkill.  To set a container-wide TTL, follow [these steps](https://learn.microsoft.com/en-us/azure/cosmos-db/nosql/how-to-time-to-live?tabs=dotnet-sdk-v3#enable-time-to-live-on-a-container-using-the-azure-portal).
+
+# COMMAND ----------
+
+# MAGIC %md To prevent you from forgetting to turn off this loop accidentally, we shut down the streams after 30 minutes. You may remove this line if you intend to leave the streams running indefinitely.
+
+# COMMAND ----------
+
+time.sleep(1800)
+for s in spark.streams.active:
+  s.stop()
 
 # COMMAND ----------
 

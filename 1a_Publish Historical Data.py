@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %md The purpose of this notebook is to publish the historical data and features for use in the Clickstream Propensity solution accelerator.  This notebook was developed on a **Databricks ML 12.1** cluster.
+# MAGIC %md The purpose of this notebook is to publish the historical data and features for use in the Clickstream Propensity solution accelerator. You may find this notebook at https://github.com/databricks-industry-solutions/clickstream-analytics
 
 # COMMAND ----------
 
@@ -10,7 +10,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,Get Config Info
-# MAGIC %run "./CS 0a: Intro & Config"
+# MAGIC %run "./0a_Intro & Config"
 
 # COMMAND ----------
 
