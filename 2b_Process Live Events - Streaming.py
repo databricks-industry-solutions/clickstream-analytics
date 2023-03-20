@@ -579,15 +579,18 @@ print(f"cosmosdb_uri:\t{config['cosmosdb_uri']}")
 
 # MAGIC %md Before proceeding, it's a good idea to make sure you've configured your Databricks cluster to use the latest [Azure Cosmos DB Spark 3 OLTP Connector for SQL API](https://github.com/Azure/azure-sdk-for-java/blob/main/sdk/cosmos/azure-cosmos-spark_3-2_2-12/README.md#download).  As a Java JAR, it must be installed as either a [cluster or workspace library](https://learn.microsoft.com/en-us/azure/databricks/libraries/). 
 # MAGIC 
-# MAGIC **NOTE** At the time of development, the latest connector was *azure-cosmos-spark_3-3_2-12 version 4.17.0*. 
+# MAGIC **NOTE** At the time of development, the latest connector was *azure-cosmos-spark_3-3_2-12 version 4.17.0*, which is the version of connector in the *clickstream_photon_cluster* that the **RUNME** notebook creates for you.
 
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC # TODO: remove the CLI part of this instruction because we provide API script for setting up secret scope; keep the discussion around concepts 
 # MAGIC With the Azure CosmosDB document store deployed and the library installed, we now need to record the read-only and read-write authentication keys for the store as [Databricks secrets](https://learn.microsoft.com/en-us/azure/databricks/security/secrets/secrets#create-a-secret-in-a-databricks-backed-scope). In an Azure environment, you can create either a Databricks-backed scope or an Azure Key Vault scope.  In this demo, we have employed a Databricks-backed scope to keep things simpler.
 # MAGIC 
-# MAGIC To setup a secret, you need to make use of the Databricks CLI. To use the CLI, you first need to install and configure it to your local system, and to do that, you'll need to follow the instructions provided [here](https://learn.microsoft.com/en-us/azure/databricks/dev-tools/cli/). (While the CLI runs on your local system, it creates the secrets in the environment for which it has been configured.  It is critical that you configure your installation of the Databricks CLI to point to the environment where you are running these notebooks.)
+# MAGIC ### Option 1
+# MAGIC To use the Databricks API to set up the secret scopes, we provided a sample script for you in the **RUNME** notebook. The sample script also helps you set up secrets for other credentials needed, such as the Kaggle credential and the Event hub credentials for streaming.
+# MAGIC 
+# MAGIC ### Option 2
+# MAGIC Another option of settig up the secret scope is to make use of the Databricks CLI. To use the CLI, you first need to install and configure it to your local system, and to do that, you'll need to follow the instructions provided [here](https://learn.microsoft.com/en-us/azure/databricks/dev-tools/cli/). (While the CLI runs on your local system, it creates the secrets in the environment for which it has been configured.  It is critical that you configure your installation of the Databricks CLI to point to the environment where you are running these notebooks.)
 # MAGIC 
 # MAGIC After it's been configured, you'll need to setup two secret scopes, one to hold your read-only key and the other to hold your read-write key.  For example, you might create scopes as follows:
 # MAGIC 

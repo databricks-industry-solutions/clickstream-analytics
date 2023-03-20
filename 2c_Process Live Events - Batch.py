@@ -235,7 +235,7 @@ def publish_features(cutoff_date, groupby_keys=[], target_table=None):
 # MAGIC 
 # MAGIC Now we can write our logic to publish features as we move through simulated time.  In a real-world implementation of this logic, we would not setup such a loop and instead would call a script on a predefined schedule.  But because we are simulating data coming in in accelerated real-time, we setup an indefinite loop and in that loop try to determine when we've crossed into a new day and therefore required new data to be published. 
 # MAGIC 
-# MAGIC Please note that this loop logic will run **indefinitely**.  You must stop the execution of this code when you are done with this demonstration or it will trigger your cluster to continue running over time:
+# MAGIC To prevent you from forgetting to turn off this loop, we cap the execution for 3 cycles
 
 # COMMAND ----------
 
@@ -248,9 +248,9 @@ last_event_date = datetime.strptime('1970-01-01','%Y-%m-%d')
 import time
 timeout_start = time.time()
 
-while time.time() < timeout_start + 1800: # to prevent you from forgetting to turn off this loop, we cap the execution for 3 cycles
+while time.time() < timeout_start + 1800: # To prevent you from forgetting to turn off this loop, we cap the execution for 3 cycles
 
-# while True: # use this while condition if you want to leave the loop running indefinitely
+# while True: # use this while condition if you want to leave the loop running indefinitely; You must stop the execution of this code when you are done with this demonstration or it will trigger your cluster to continue running over time: 
   
   # poll silver table for last observed time
   event_date = (
