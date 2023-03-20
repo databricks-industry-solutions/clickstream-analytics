@@ -13,7 +13,7 @@
 # MAGIC 
 # MAGIC In this solution accelerator, we leverage event data from an electronics ecommerce site to demonstrate how such data may be used to estimate these propensities.  We first use a historical backlog of these data to train a model.  We then implement a real-time stream to calculate features supporting inference with each page clicked.  You can think of the accelerator as divided into these two parts where in the first we focus on understanding the data and how we might approach the Data Science portion of our work.  In the second, the focus is on the mechanics of building a real-time inference layer.  Before diving into those parts (identify by the number associated with different notebooks), be sure to run notebook *0b* to stage the data required for both parts.
 # MAGIC 
-# MAGIC **NOTE** This accelerator uses the newly released Databricks Model Serving capability which is avaiable in only select regions.  Please consult the feature documentation to determine if your workspace is in a supported cloud and region ([Azure](https://learn.microsoft.com/en-us/azure/databricks/machine-learning/model-serving/#--region-availability), [AWS](https://docs.databricks.com/machine-learning/model-serving/index.html#region-availability)) before deploying the accelerator.
+# MAGIC **NOTE** This accelerator uses the newly released Databricks Model Serving capability which is avaiable in only select regions.  Please consult the feature documentation to determine if your workspace is in a supported region ([Azure](https://learn.microsoft.com/en-us/azure/databricks/machine-learning/model-serving/#--region-availability)) before deploying the accelerator.
 
 # COMMAND ----------
 
