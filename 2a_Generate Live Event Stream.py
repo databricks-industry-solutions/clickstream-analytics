@@ -97,7 +97,10 @@ print( f'First Event: {timestamps[0]} | Last Event: {timestamps[-1]}' )
 last_ts = timestamps[0]
 
 # for each set of events
-for i, ts in enumerate(timestamps):
+# for i, ts in enumerate(timestamps): # Runs in about 3 hours
+
+# for a subset of events to limit run duration
+for i, ts in enumerate(timestamps[:10000]): # Runs in about 3 hours
   
   # notify of date change
   if (last_ts.date() != ts.date()) or (i==0):
