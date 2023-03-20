@@ -111,10 +111,6 @@ config['eh_sasl'] = 'kafkashaded.org.apache.kafka.common.security.plain.PlainLog
 
 # COMMAND ----------
 
-config['eh_kafka_topic'], config['eh_bootstrap_servers'], config['eh_sasl']
-
-# COMMAND ----------
-
 # DBTITLE 1,Online Feature Store (see notebook 2b for more info)
 # azure cosmosdb uri
 # here we use a secret scope to hold the cosmosdb uri; see the RUNME notebook after import to find instructions for how to set up this secret 
