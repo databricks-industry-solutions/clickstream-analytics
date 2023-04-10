@@ -44,7 +44,7 @@ cart_product_outcomes = (
         )
   )
 
-display(cart_product_outcomes.orderBy('user_id','product_id'))
+display(cart_product_outcomes.orderBy('user_id','product_id').limit(100))
 
 # COMMAND ----------
 
@@ -94,7 +94,7 @@ for table_name, key_fields in metrics_map.items():
     )
 
 # display feature data
-display(raw_features)
+display(raw_features.limit(100))
 
 # COMMAND ----------
 
@@ -111,7 +111,7 @@ raw_features_and_labels = (
       )
   )
 
-display(raw_features_and_labels.orderBy('user_id','user_session','event_time'))
+display(raw_features_and_labels.orderBy('user_id','user_session','event_time').limit(100))
 
 # COMMAND ----------
 
